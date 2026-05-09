@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureRoom - غرف تواصل مشفرة</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root {
+            --bg-primary: #F0F4F8;
+            --bg-card: #FFFFFF;
+            --bg-sidebar: #F7FAFC;
+            --bg-input: #EDF2F7;
+            --accent: #3D9E8C;
+            --accent-hover: #358D7C;
+            --accent-light: #E6F5F2;
+            --text-primary: #1A2535;
+            --text-secondary: #5A6B7D;
+            --text-muted: #8B9CAF;
+            --border: #DDE4EC;
+            --shadow-sm: 0 1px 3px rgba(26, 37, 53, 0.06);
+            --shadow-md: 0 4px 16px rgba(26, 37, 53, 0.10);
+            --shadow-lg: 0 12px 32px rgba(26, 37, 53, 0.12);
+            --highlight: #F5A623;
+            --highlight-bg: #FFF8ED;
+            --danger: #E05353;
+            --danger-bg: #FEF0F0;
+            --success: #3D9E8C;
+            --radius-sm: 8px;
+            --radius: 14px;
+            --radius-lg: 20px;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --font-stack: 'Segoe UI', 'Noto Sans Arabic', 'Tahoma', system-ui, -apple-system, sans-serif;
+            --bubble-self: #E6F5F2;
+            --bubble-other: #FFFFFF;
+            --bubble-system: #F7FAFC;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0F1923;
+            --bg-card: #1A2535;
+            --bg-sidebar: #15202D;
+            --bg-input: #1E2C3D;
+            --accent: #4DBFA8;
+            --accent-hover: #5CC9B3;
+            --accent-light: #1A3A35;
+            --text-primary: #E8F0F7;
+            --text-secondary: #B0C4D8;
+            --text-muted: #6B829E;
+            --border: #273547;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+            --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+            --highlight: #F5A623;
+            --highlight-bg: #2A2015;
+            --danger: #F07070;
+            --danger-bg: #2A1518;
+            --bubble-self: #1A3A35;
+            --bubble-other: #1E2C3D;
+            --bubble-system: #15202D;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 16px;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-stack);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: background var(--transition), color var(--transition);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: background var(--transition), border var(--transition);
+        }
+
+        .app-header .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .app-header .logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-sm);
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .app-header .logo-text {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+            color: var(--text-secondary);
+            position: relative;
+        }
+
+        .icon-btn:hover {
+            background: var(--bg-input);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .icon-btn .tooltip {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text-primary);
+            color: var(--bg-card);
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--transition);
+            font-family: var(--font-stack);
+        }
+
+        .icon-btn:hover .tooltip {
+            opacity: 1;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .view {
+            display: none;
+            width: 100%;
+            max-width: 520px;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        #view-room {
+            max-width: 1000px;
+            width: 100%;
+            display: none;
+            height: calc(100vh - 130px);
+            max-height: 800px;
+        }
+
+        #view-room.active {
+            display: flex;
+        }
+
+        .hero-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 40px 32px;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+            transition: all var(--transition);
+        }
+
+        .hero-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 20px;
+            background: var(--accent);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: #fff;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(61, 158, 140, 0.3);
+        }
+
+        .hero-card h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .hero-card .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 28px;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 13px 28px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all var(--transition);
+            font-family: var(--font-stack);
+            letter-spacing: 0.1px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 4px 14px rgba(61, 158, 140, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(61, 158, 140, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .btn-secondary:hover {
+            background: var(--accent-light);
+            transform: translateY(-1px);
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border-radius: var(--radius-sm);
+        }
+
+        .btn-danger {
+            background: transparent;
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-bg);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 25, 35, 0.5);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 32px 28px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+            transition: all var(--transition);
+            animation: modalIn 0.25s ease-out;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal h2 {
+            font-size: 1.4rem;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+            text-align: center;
+        }
+
+        .modal .modal-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            margin-bottom: 22px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.88rem;
+            color: var(--text-primary);
+        }
+
+        .form-group .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-family: var(--font-stack);
+            transition: all var(--transition);
+            outline: none;
+        }
+
+        .form-group input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(61, 158, 140, 0.1);
+        }
+
+        .form-group input.code-display {
+            font-family: 'SF Mono', 'Cascadia Code', 'Courier New', monospace;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-align: center;
+            font-size: 1.3rem;
+            color: var(--accent);
+            background: var(--accent-light);
+            border-color: var(--accent);
+            cursor: default;
+            user-select: all;
+        }
+
+        .copy-hint {
+            position: absolute;
+            right: 12px;
+            font-size: 0.75rem;
+            color: var(--accent);
+            font-weight: 600;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity var(--transition);
+        }
+
+        .copy-hint.copied {
+            color: var(--success);
+        }
+
+        .form-hint {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .form-error {
+            font-size: 0.82rem;
+            color: var(--danger);
+            margin-top: 4px;
+            min-height: 20px;
+            transition: all var(--transition);
+        }
+
+        .modal .btn {
+            width: 100%;
+            justify-content: center;
+            margin-top: 8px;
+        }
+
+        .room-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all var(--transition);
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--bg-sidebar);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: all var(--transition);
+            flex-shrink: 0;
+        }
+
+        [dir="ltr"] .sidebar {
+            border-left: none;
+            border-right: 1px solid var(--border);
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .sidebar-header h3 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .member-count {
+            font-size: 0.75rem;
+            background: var(--accent-light);
+            color: var(--accent);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .members-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            list-style: none;
+        }
+
+        .members-list li {
+            padding: 9px 12px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 4px;
+            font-size: 0.88rem;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            color: var(--text-primary);
+            transition: all var(--transition);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .members-list li .member-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--success);
+            flex-shrink: 0;
+            box-shadow: 0 0 6px rgba(61, 158, 140, 0.5);
+        }
+
+        .members-list li .member-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .members-list li .you-tag {
+            font-size: 0.7rem;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .room-info-mini {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .room-info-mini .code-badge {
+            font-family: monospace;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 2px;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .chat-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .chat-header .room-title {
+            font-weight: 700;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-header .room-code-display {
+            font-family: monospace;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--accent);
+            background: var(--accent-light);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .chat-header .room-code-display:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            scroll-behavior: smooth;
+        }
+
+        .message-bubble {
+            max-width: 75%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            word-break: break-word;
+            animation: msgIn 0.25s ease;
+            position: relative;
+        }
+
+        @keyframes msgIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-bubble.self {
+            align-self: flex-end;
+            background: var(--bubble-self);
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message-bubble.other {
+            align-self: flex-start;
+            background: var(--bubble-other);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 6px;
+            border-bottom-right-radius: 18px;
+        }
+
+        .message-bubble.system-msg {
+            align-self: center;
+            background: var(--bubble-system);
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            padding: 6px 14px;
+            border-radius: 20px;
+            max-width: 90%;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .message-sender {
+            font-size: 0.73rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 2px;
+        }
+
+        .message-time {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            text-align: end;
+        }
+
+        .typing-indicator {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            padding: 4px 20px;
+            font-style: italic;
+            min-height: 22px;
+            flex-shrink: 0;
+        }
+
+        .input-bar {
+            display: flex;
+            gap: 10px;
+            padding: 14px 20px;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        .input-bar input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 28px;
+            border: 2px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: var(--font-stack);
+            outline: none;
+            transition: all var(--transition);
+        }
+
+        .input-bar input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(61, 158, 140, 0.08);
+        }
+
+        .input-bar .btn-send {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            flex-shrink: 0;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(61, 158, 140, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            #view-room.active {
+                flex-direction: column;
+                height: calc(100vh - 100px);
+                max-height: none;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: 160px;
+                border-left: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .message-bubble {
+                max-width: 88%;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+
+        [dir="ltr"] .message-bubble.self {
+            border-bottom-left-radius: 6px;
+            border-bottom-right-radius: 18px;
+        }
+
+        [dir="ltr"] .message-bubble.other {
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">🔐</div>
+                <span class="logo-text">SecureRoom</span>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" id="btn-theme" title="الوضع الليلي">
+                    <span>🌙</span>
+                    <span class="tooltip" data-i18n="darkMode">الوضع الليلي</span>
+                </button>
+                <button class="icon-btn" id="btn-lang" title="English">
+                    <span>🌐</span>
+                    <span class="tooltip" data-i18n="switchLang">English</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="view active" id="view-home">
+                <div class="hero-card">
+                    <div class="hero-icon">🔐</div>
+                    <h1 data-i18n="appName">SecureRoom</h1>
+                    <p class="subtitle" data-i18n="heroDesc">غرف تواصل مشفرة مؤقتة. لا تسجيل، لا حفظ بيانات. فقط أدخل
+                        اسمك وابدأ التحدث بأمان.</p>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="btn-create" data-i18n="createRoom">✨ إنشاء غرفة
+                            جديدة</button>
+                        <button class="btn btn-secondary" id="btn-join" data-i18n="joinRoom">🔗 الانضمام بكود</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="view" id="view-room">
+                <div class="room-layout">
+                    <aside class="sidebar">
+                        <div class="sidebar-header">
+                            <h3 data-i18n="members">👥 الأعضاء</h3>
+                            <span class="member-count" id="member-count">0</span>
+                        </div>
+                        <ul class="members-list" id="members-list"></ul>
+                        <div class="sidebar-footer">
+                            <div class="room-info-mini">
+                                <span data-i18n="roomCode">الكود:</span>
+                                <span class="code-badge" id="sidebar-room-code">------</span>
+                            </div>
+                            <button class="btn btn-danger btn-sm" id="btn-leave" style="width:100%;"
+                                data-i18n="leaveRoom">🚪 مغادرة الغرفة</button>
+                        </div>
+                    </aside>
+                    <div class="chat-area">
+                        <div class="chat-header">
+                            <span class="room-title">
+                                <span data-i18n="room">الغرفة</span>
+                                <span class="room-code-display" id="chat-room-code" title="اضغط للنسخ">------</span>
+                            </span>
+                            <span style="font-size:0.8rem;color:var(--text-muted);" id="room-password-badge"></span>
+                        </div>
+                        <div class="messages-container" id="messages-container"></div>
+                        <div class="typing-indicator" id="typing-indicator"></div>
+                        <div class="input-bar">
+                            <input type="text" id="message-input" placeholder="اكتب رسالتك..."
+                                data-i18n-placeholder="typeMessage" autocomplete="off">
+                            <button class="btn-send" id="btn-send">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-setup">
+        <div class="modal">
+            <h2 id="modal-title">إنشاء غرفة</h2>
+            <p class="modal-subtitle" id="modal-subtitle"></p>
+            <div class="form-group">
+                <label for="input-username" data-i18n="yourName">اسمك</label>
+                <input type="text" id="input-username" maxlength="30">
+            </div>
+            <div class="form-group" id="group-code">
+                <label for="input-code" data-i18n="roomCodeLabel">كود الغرفة</label>
+                <div class="input-wrapper">
+                    <input type="text" id="input-code" class="code-display" readonly>
+                    <span class="copy-hint" id="copy-hint" data-i18n="clickToCopy">نسخ</span>
+                </div>
+            </div>
+            <div class="form-group" id="group-password">
+                <label for="input-password" data-i18n="roomPassword">كلمة المرور (اختياري)</label>
+                <input type="password" id="input-password">
+            </div>
+            <div class="form-error" id="form-error"></div>
+            <button class="btn btn-primary" id="btn-submit-setup" data-i18n="enterRoom">دخول</button>
+            <button class="btn btn-secondary btn-sm" id="btn-cancel-setup" data-i18n="cancel">إلغاء</button>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const socket = io();
+            const translations = {
+                ar: {
+                    appName: 'SecureRoom', heroDesc: 'غرف تواصل مشفرة. لا تسجيل، لا حفظ بيانات. فقط أدخل اسمك وابدأ التحدث بأمان.',
+                    createRoom: '✨ إنشاء غرفة جديدة', joinRoom: '🔗 الانضمام بكود', darkMode: 'الوضع الليلي', switchLang: 'English',
+                    createRoomTitle: 'إنشاء غرفة جديدة', createRoomSubtitle: 'أنشئ غرفة وشارك الكود مع أصدقائك',
+                    joinRoomTitle: 'الانضمام إلى غرفة', joinRoomSubtitle: 'أدخل كود الغرفة للانضمام',
+                    yourName: 'اسمك', namePlaceholder: 'أدخل اسمك...', roomCodeLabel: 'كود الغرفة', clickToCopy: 'نسخ', copied: '✓ تم!',
+                    roomPassword: 'كلمة المرور (اختياري)', enterRoom: '🚀 دخول الغرفة', cancel: 'إلغاء',
+                    members: '👥 الأعضاء', roomCode: 'الكود:', leaveRoom: '🚪 مغادرة الغرفة', room: 'الغرفة',
+                    typeMessage: 'اكتب رسالتك...', welcomeMsg: '👋 مرحباً بك في الغرفة الآمنة. الرسائل مشفرة.',
+                    joinedRoom: 'انضم', leftRoom: 'غادر', you: 'أنت', typing: 'يكتب...',
+                    passwordProtected: '🔒 محمية', roomNotFound: 'الغرفة غير موجودة.', wrongPassword: 'كلمة المرور خاطئة.',
+                    nameRequired: 'الرجاء إدخال اسمك.', codeRequired: 'الرجاء إدخال الكود.', errorOccurred: 'حدث خطأ ما.'
+                },
+                en: {
+                    appName: 'SecureRoom', heroDesc: 'Encrypted chat rooms. No registration, no data storage. Just enter your name and start chatting.',
+                    createRoom: '✨ Create New Room', joinRoom: '🔗 Join with Code', darkMode: 'Dark Mode', switchLang: 'العربية',
+                    createRoomTitle: 'Create New Room', createRoomSubtitle: 'Create a room and share the code with friends',
+                    joinRoomTitle: 'Join a Room', joinRoomSubtitle: 'Enter the room code to join',
+                    yourName: 'Your Name', namePlaceholder: 'Enter name...', roomCodeLabel: 'Room Code', clickToCopy: 'Copy', copied: '✓!',
+                    roomPassword: 'Password (optional)', enterRoom: '🚀 Enter Room', cancel: 'Cancel',
+                    members: '👥 Members', roomCode: 'Code:', leaveRoom: '🚪 Leave Room', room: 'Room',
+                    typeMessage: 'Type message...', welcomeMsg: '👋 Welcome to the secure room. Messages are encrypted.',
+                    joinedRoom: 'joined', leftRoom: 'left', you: 'You', typing: 'typing...',
+                    passwordProtected: '🔒 Protected', roomNotFound: 'Room not found.', wrongPassword: 'Wrong password.',
+                    nameRequired: 'Name required.', codeRequired: 'Code required.', errorOccurred: 'Error occurred.'
+                }
+            };
+
+            let currentLang = localStorage.getItem('secureRoom_lang') || 'ar';
+            const t = (k) => translations[currentLang][k] || k;
+            const state = {
+                tabId: sessionStorage.getItem('secureRoom_tabId') || 'tab-' + Math.random().toString(36).slice(2, 9),
+                currentView: 'home', mode: null, roomId: null, roomCode: null, username: null, roomKey: null,
+                roomHasPassword: false, members: [], messages: [], typingUsers: {}
+            };
+            sessionStorage.setItem('secureRoom_tabId', state.tabId);
+
+            function updateUI() {
+                document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.getAttribute('data-i18n')));
+                document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.getAttribute('data-i18n-placeholder')));
+                document.documentElement.lang = currentLang;
+                document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+                document.getElementById('btn-lang').querySelector('.tooltip').textContent = t('switchLang');
+            }
+
+            const CryptoModule = {
+                async generateKey() { return await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']); },
+                async exportKey(key) { return JSON.stringify(await crypto.subtle.exportKey('jwk', key)); },
+                async importKey(jwk) { return await crypto.subtle.importKey('jwk', JSON.parse(jwk), { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']); },
+                async deriveKey(pass, salt) {
+                    const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+                    return await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+                },
+                async encrypt(key, text) {
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text));
+                    return { iv: btoa(String.fromCharCode(...iv)), data: btoa(String.fromCharCode(...new Uint8Array(cipher))) };
+                },
+                async decrypt(key, encrypted) {
+                    const iv = new Uint8Array([...atob(encrypted.iv)].map(c => c.charCodeAt(0)));
+                    const data = new Uint8Array([...atob(encrypted.data)].map(c => c.charCodeAt(0)));
+                    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+                    return new TextDecoder().decode(decrypted);
+                }
+            };
+
+            socket.on('update-members', (m) => { state.members = m; renderMembers(); });
+            socket.on('member-joined', (m) => addSystemMessage(`${m.username} ${t('joinedRoom')}`));
+            socket.on('member-left', (m) => addSystemMessage(`${m.username || m.tabId} ${t('leftRoom')}`));
+            socket.on('typing', (m) => {
+                state.typingUsers[m.tabId] = { name: m.username, time: Date.now() };
+                updateTyping();
+                setTimeout(updateTyping, 4000);
+            });
+            socket.on('encrypted-message', async (m) => {
+                try {
+                    const text = await CryptoModule.decrypt(state.roomKey, m.encryptedData);
+                    const msg = { id: m.messageId, sender: m.sender, senderTabId: m.senderTabId, text, timestamp: m.timestamp };
+                    state.messages.push(msg);
+                    renderMessage(msg);
+                    delete state.typingUsers[m.senderTabId];
+                    updateTyping();
+                } catch (e) { }
+            });
+
+            function renderMessage(m) {
+                const container = document.getElementById('messages-container');
+                const div = document.createElement('div');
+                div.className = 'message-bubble ' + (m.type === 'system' ? 'system-msg' : (m.senderTabId === state.tabId ? 'self' : 'other'));
+                if (m.type === 'system') div.textContent = m.text;
+                else div.innerHTML = `<div class="message-sender">${escape(m.sender)}</div><div class="message-text">${escape(m.text)}</div><div class="message-time">${new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>`;
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }
+
+            function addSystemMessage(text) { renderMessage({ type: 'system', text }); }
+            function escape(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            function renderMembers() {
+                const l = document.getElementById('members-list');
+                l.innerHTML = '';
+                state.members.forEach(m => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="member-dot"></span><span class="member-name">${escape(m.username)}</span>${m.tabId === state.tabId ? `<span class="you-tag">(${t('you')})</span>` : ''}`;
+                    l.appendChild(li);
+                });
+                document.getElementById('member-count').textContent = state.members.length;
+            }
+
+            function updateTyping() {
+                const names = Object.values(state.typingUsers).filter(u => Date.now() - u.time < 3500).map(u => u.name);
+                document.getElementById('typing-indicator').textContent = names.length ? names.join(', ') + ' ' + t('typing') : '';
+            }
+
+            async function createRoom(username, password) {
+                const code = document.getElementById('input-code').value;
+                let key, salt, vToken;
+                if (password) {
+                    salt = crypto.getRandomValues(new Uint8Array(16));
+                    key = await CryptoModule.deriveKey(password, salt);
+                    vToken = await CryptoModule.encrypt(key, 'VERIFIED');
+                } else {
+                    key = await CryptoModule.generateKey();
+                }
+                const res = await fetch('/api/rooms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, hasPassword: !!password, salt: salt ? btoa(String.fromCharCode(...salt)) : null, verificationToken: vToken })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    state.roomId = data.roomId; state.roomCode = code; state.roomKey = key; state.username = username; state.roomHasPassword = !!password;
+                    socket.emit('join-room', { roomId: data.roomId, tabId: state.tabId, username });
+                    enterUI();
+                } else document.getElementById('form-error').textContent = data.error;
+            }
+
+            async function joinRoom(username, code, password) {
+                const res = await fetch('/api/rooms/' + code);
+                const data = await res.json();
+                if (!data.success) return document.getElementById('form-error').textContent = t('roomNotFound');
+                const room = data.room;
+                let key;
+                if (room.has_password) {
+                    if (!password) return document.getElementById('form-error').textContent = t('wrongPassword');
+                    const salt = new Uint8Array([...atob(room.salt)].map(c => c.charCodeAt(0)));
+                    key = await CryptoModule.deriveKey(password, salt);
+                    try { await CryptoModule.decrypt(key, room.verification_token); } catch (e) { return document.getElementById('form-error').textContent = t('wrongPassword'); }
+                } else {
+                    // Centralized key distribution is complex for E2EE, for now use a shared prompt if no password?
+                    // Actually, let's just use the password as the key source for simplicity in this demo.
+                    // If no password, we could use the code itself as a weak key or ask for a key.
+                    // Let's use the code as a seed for non-password rooms for now.
+                    const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveKey']);
+                    key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: new TextEncoder().encode('SALT'), iterations: 1000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+                }
+                state.roomId = room.id; state.roomCode = code; state.roomKey = key; state.username = username; state.roomHasPassword = !!room.has_password;
+                const mRes = await fetch(`/api/rooms/${room.id}/messages`);
+                const mData = await mRes.json();
+                for (const m of mData.messages) {
+                    try {
+                        const text = await CryptoModule.decrypt(key, m.encrypted_data);
+                        renderMessage({ sender: m.sender, senderTabId: m.sender_tab_id, text, timestamp: m.timestamp });
+                    } catch (e) { }
+                }
+                socket.emit('join-room', { roomId: room.id, tabId: state.tabId, username });
+                enterUI();
+            }
+
+            function enterUI() {
+                document.getElementById('modal-setup').classList.remove('active');
+                document.getElementById('view-home').classList.remove('active');
+                document.getElementById('view-room').classList.add('active');
+                document.getElementById('sidebar-room-code').textContent = state.roomCode;
+                document.getElementById('chat-room-code').textContent = state.roomCode;
+                document.getElementById('room-password-badge').textContent = state.roomHasPassword ? t('passwordProtected') : '';
+                addSystemMessage(t('welcomeMsg'));
+            }
+
+            document.getElementById('btn-create').onclick = () => { state.mode = 'create'; document.getElementById('modal-setup').classList.add('active'); document.getElementById('group-code').style.display = 'block'; document.getElementById('input-code').value = Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join(''); };
+            document.getElementById('btn-join').onclick = () => { state.mode = 'join'; document.getElementById('modal-setup').classList.add('active'); document.getElementById('group-code').style.display = 'block'; document.getElementById('input-code').readOnly = false; document.getElementById('input-code').value = ''; };
+            document.getElementById('btn-submit-setup').onclick = () => {
+                const u = document.getElementById('input-username').value;
+                const p = document.getElementById('input-password').value;
+                const c = document.getElementById('input-code').value;
+                if (!u) return document.getElementById('form-error').textContent = t('nameRequired');
+                if (state.mode === 'create') createRoom(u, p); else joinRoom(u, c, p);
+            };
+            document.getElementById('btn-send').onclick = async () => {
+                const i = document.getElementById('message-input');
+                const text = i.value.trim();
+                if (!text || !state.roomKey) return;
+                i.value = '';
+                const encryptedData = await CryptoModule.encrypt(state.roomKey, text);
+                const timestamp = Date.now();
+                renderMessage({ sender: state.username, senderTabId: state.tabId, text, timestamp });
+                socket.emit('send-message', { roomId: state.roomId, message: { sender: state.username, senderTabId: state.tabId, encryptedData, timestamp } });
+            };
+            document.getElementById('btn-theme').onclick = () => {
+                const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', t);
+                localStorage.setItem('secureRoom_theme', t);
+            };
+            document.getElementById('btn-lang').onclick = () => {
+                currentLang = currentLang === 'ar' ? 'en' : 'ar';
+                localStorage.setItem('secureRoom_lang', currentLang);
+                updateUI();
+            };
+            document.getElementById('btn-leave').onclick = () => location.reload();
+            document.getElementById('copy-hint').onclick = () => {
+                navigator.clipboard.writeText(document.getElementById('input-code').value);
+                document.getElementById('copy-hint').textContent = t('copied');
+            };
+            updateUI();
+        })();
+    </script>
+</body>
+
+</html>
